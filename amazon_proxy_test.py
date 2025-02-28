@@ -36,6 +36,82 @@ PROXY_FILES_FOLDER = "proxies/proxies"
 CHECKED_PROXY_FOLDER = "proxies/passing_proxies"
 BLACKLIST_FILE = "proxies/failed_proxies.txt"
 
+# Global settings
+VERBOSITY_LEVEL = 0  # Default to minimal logging (only progress and errors)
+
+# Statistics tracking
+class ProxyStats:
+    def __init__(self):
+        self.total_checked = 0
+        self.by_protocol = {}  # Protocol -> {checked, working, failed}
+        self.failure_reasons = {}  # Reason -> count
+    
+    def init_protocol(self, protocol):
+        """Initialize stats for a specific protocol if not already present"""
+        if protocol not in self.by_protocol:
+            self.by_protocol[protocol] = {
+                "checked": 0,
+                "working": 0,
+                "failed": 0
+            }
+    
+    def add_success(self, proxy):
+        """Record a successful proxy check"""
+        protocol = proxy.protocol
+        self.init_protocol(protocol)
+        self.by_protocol[protocol]["working"] += 1
+        self.by_protocol[protocol]["checked"] += 1
+        self.total_checked += 1
+        
+    def add_failure(self, proxy, reason="unknown"):
+        """Record a failed proxy check with reason"""
+        protocol = proxy.protocol
+        self.init_protocol(protocol)
+        self.by_protocol[protocol]["failed"] += 1
+        self.by_protocol[protocol]["checked"] += 1
+        self.total_checked += 1
+        
+        # Track failure reasons
+        if reason not in self.failure_reasons:
+            self.failure_reasons[reason] = 0
+        self.failure_reasons[reason] += 1
+    
+    def display_summary(self):
+        """Display a summary of proxy statistics"""
+        print("\n" + "="*60)
+        print("PROXY CHECKING SUMMARY")
+        print("="*60)
+        
+        # Overall statistics
+        total_working = sum(stats["working"] for stats in self.by_protocol.values())
+        overall_success_rate = (total_working / self.total_checked * 100) if self.total_checked > 0 else 0
+        print(f"Total proxies checked: {self.total_checked}")
+        print(f"Working proxies: {total_working} ({overall_success_rate:.1f}%)")
+        print(f"Failed proxies: {self.total_checked - total_working} ({100 - overall_success_rate:.1f}%)")
+        
+        # Statistics by protocol
+        print("\nResults by protocol:")
+        print("-"*60)
+        print(f"{'Protocol':<10} {'Checked':<10} {'Working':<10} {'Failed':<10} {'Success %':<10}")
+        print("-"*60)
+        
+        for protocol, stats in self.by_protocol.items():
+            success_rate = (stats["working"] / stats["checked"] * 100) if stats["checked"] > 0 else 0
+            print(f"{protocol:<10} {stats['checked']:<10} {stats['working']:<10} {stats['failed']:<10} {success_rate:.1f}%")
+        
+        # Failure reasons
+        if self.failure_reasons:
+            print("\nFailure reasons:")
+            print("-"*60)
+            for reason, count in sorted(self.failure_reasons.items(), key=lambda x: x[1], reverse=True):
+                percentage = (count / (self.total_checked - total_working) * 100) if (self.total_checked - total_working) > 0 else 0
+                print(f"{reason}: {count} ({percentage:.1f}%)")
+        
+        print("="*60)
+
+# Create global stats instance
+PROXY_STATS = ProxyStats()
+
 class Proxy:
     def __init__(self, protocol: str, address: str) -> None:
         self.protocol = protocol
@@ -45,7 +121,7 @@ class Proxy:
         self.link = f"{protocol}://{address}"
 
 
-def log(message, level="I"):
+def log(message, level="I", verbosity=1):
     """
     Simple logging function that prints messages with a specified level prefix.
     
@@ -53,12 +129,24 @@ def log(message, level="I"):
         message (str): The message to be logged
         level (str, optional): The log level indicator. Defaults to "I".
             Accepted values: "I" (INFO), "W" (WARNING), "E" (ERROR)
+        verbosity (int, optional): The verbosity level of the message.
+            0: Always show (progress & errors)
+            1: Show important info (default)
+            2: Show detailed debug info
     
     Returns:
         None
     """
-    levels = {"I": "INFO", "W": "WARNING", "E": "ERROR"}
-    print(f"[{levels.get(level, 'INFO')}] {message}")
+    # Global verbosity level - controls which messages are displayed
+    # 0: Only progress and errors
+    # 1: Important info (default)
+    # 2: Detailed debug info
+    global VERBOSITY_LEVEL
+    
+    # Only print if the message's verbosity level is less than or equal to the global level
+    if verbosity <= VERBOSITY_LEVEL or level == "E":  # Always show errors
+        levels = {"I": "INFO", "W": "WARNING", "E": "ERROR"}
+        print(f"[{levels.get(level, 'INFO')}] {message}")
 
 
 def check_socks() -> bool:
@@ -123,7 +211,7 @@ def check_proxy(proxy: Proxy) -> bool:
                 if response.status_code == 200:
                     # For Amazon URLs, check price visibility
                     if "amazon" in website:
-                        log(f"Testing price visibility on {website}")
+                        log(f"Testing price visibility on {website}", verbosity=2)
                         from amazon_price_checker import check_amazon_price_visibility
                         
                         # Second check - Price visibility
@@ -138,16 +226,27 @@ def check_proxy(proxy: Proxy) -> bool:
                             },
                             timeout=CHECK_TIMEOUT_SECONDS
                         ):
-                            log(f"Price visible through proxy {proxy.link}")
+                            log(f"Price visible through proxy {proxy.link}", verbosity=2)
+                            # Record successful proxy
+                            PROXY_STATS.add_success(proxy)
                             return True
                         else:
-                            log(f"Price not visible through proxy {proxy.link}")
+                            log(f"Price not visible through proxy {proxy.link}", verbosity=2)
+                            # Record failure with specific reason
+                            PROXY_STATS.add_failure(proxy, "Price not visible")
                             continue  # Try next website
                     else:
                         # Not an Amazon URL, basic connectivity is enough
+                        PROXY_STATS.add_success(proxy)
                         return True
+                else:
+                    # Record failure with status code
+                    PROXY_STATS.add_failure(proxy, f"HTTP {response.status_code}")
             except Exception as e:
-                log(f"Error testing proxy {proxy.link}: {str(e)}", "W")
+                log(f"Error testing proxy {proxy.link}: {str(e)}", "W", verbosity=2)
+                # Record failure with exception type
+                error_type = type(e).__name__
+                PROXY_STATS.add_failure(proxy, error_type)
                 continue  # Try next website if this one fails
         
         return False
@@ -338,13 +437,13 @@ def monitor_progress(proxy_queue, total_proxies):
     Returns:
         None
     """
-    log(f"Check started! Testing {total_proxies} proxies...")
+    log(f"Check started! Testing {total_proxies} proxies...", verbosity=0)
     
     while not proxy_queue.empty():
         remaining = proxy_queue.qsize()
         checked = total_proxies - remaining
         progress = round((checked / total_proxies) * 100, 1) if total_proxies > 0 else 0
-        log(f"Progress: {checked}/{total_proxies} ({progress}%) checked")
+        log(f"Progress: {checked}/{total_proxies} ({progress}%) checked", verbosity=0)
         time.sleep(5)  # Update progress every 5 seconds
 
 
@@ -367,7 +466,7 @@ def collect_results(callback_queue, proxies, total_proxies):
     while not callback_queue.empty():
         checked_proxies.append(callback_queue.get())
     
-    log(f"Found {len(checked_proxies)} working proxies out of {total_proxies} checked")
+    log(f"Found {len(checked_proxies)} working proxies out of {total_proxies} checked", verbosity=1)
     
     # Identify failed proxies (for blacklisting)
     checked_set = set(proxy.link for proxy in checked_proxies)
@@ -402,7 +501,7 @@ def organize_and_save_results(checked_proxies, types):
         with open(filepath, "w+") as f:
             proxy_list = results.get(protocol, [])
             f.write("\n".join(proxy_list))
-            log(f"Wrote {len(proxy_list)} {protocol} proxies to {filepath}")
+            log(f"Wrote {len(proxy_list)} {protocol} proxies to {filepath}", verbosity=1)
 
 
 def cleanup_workers(proxy_queue, workers):
@@ -548,7 +647,147 @@ def update_blacklist(failed_proxies):
     log(f"Added {new_entries} new proxies to blacklist")
 
 
-def main(workers: int, types=["http", "socks4", "socks5"]):
+def save_test_results(stats):
+    """
+    Save the test results to a JSON file for historical tracking.
+    
+    Args:
+        stats (ProxyStats): The statistics object containing test results
+    """
+    import json
+    from datetime import datetime
+    
+    # Create results directory if it doesn't exist
+    results_dir = "results"
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+    
+    # Format the results
+    results = {
+        "timestamp": datetime.now().isoformat(),
+        "total_checked": stats.total_checked,
+        "total_working": sum(s["working"] for s in stats.by_protocol.values()),
+        "protocols": {
+            protocol: {
+                "checked": data["checked"],
+                "working": data["working"],
+                "failed": data["failed"],
+                "success_rate": (data["working"] / data["checked"] * 100) if data["checked"] > 0 else 0
+            }
+            for protocol, data in stats.by_protocol.items()
+        },
+        "failure_reasons": stats.failure_reasons
+    }
+    
+    # Save to the latest results file
+    with open(os.path.join(results_dir, "latest_results.json"), "w") as f:
+        json.dump(results, f, indent=2)
+    
+    # Also save to a timestamped file for history
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    with open(os.path.join(results_dir, f"results_{timestamp}.json"), "w") as f:
+        json.dump(results, f, indent=2)
+    
+    # Update the README with latest results
+    update_readme_with_results(results)
+
+
+def update_readme_with_results(results):
+    """
+    Update the README.md file with the latest test results.
+    
+    Args:
+        results (dict): The test results dictionary
+    """
+    # Read the current README
+    with open("README.md", "r") as f:
+        readme_content = f.read()
+    
+    # Split the README into lines for processing
+    readme_lines = readme_content.split('\n')
+    
+    # Find where to insert results - look for the Example section end
+    insert_index = None
+    for i, line in enumerate(readme_lines):
+        if "Working proxies will be saved to" in line:
+            insert_index = i + 1
+            break
+    
+    if insert_index is None:
+        # If we can't find the insertion point, append to the end
+        insert_index = len(readme_lines)
+    
+    # Check if there's already a "Recent Results" section and remove it
+    results_start_index = None
+    for i, line in enumerate(readme_lines):
+        if line.strip() == "## Recent Results":
+            results_start_index = i
+            break
+    
+    if results_start_index is not None:
+        # Find where the results section ends (next ## or end of file)
+        results_end_index = len(readme_lines)
+        for i in range(results_start_index + 1, len(readme_lines)):
+            if line.startswith("## "):
+                results_end_index = i
+                break
+        
+        # Remove the existing results section
+        readme_lines = readme_lines[:results_start_index] + readme_lines[results_end_index:]
+        
+        # Adjust the insert index if needed
+        if results_start_index < insert_index:
+            insert_index = results_start_index
+    
+    # Convert timestamp to readable format
+    if 'T' in results['timestamp']:
+        timestamp = results['timestamp'].split('T')[0] + ' ' + results['timestamp'].split('T')[1][:8]
+    else:
+        timestamp = results['timestamp'][:19]
+    
+    # Format the results section
+    results_section = [
+        "",  # Empty line for spacing
+        "## Recent Results",
+        "",  # Empty line for spacing
+        f"Last test run: {timestamp}",
+        "",  # Empty line for spacing
+        "### Summary",
+        f"- **Total proxies checked**: {results['total_checked']}",
+        f"- **Working proxies**: {results['total_working']} ({results['total_working']/results['total_checked']*100:.1f}%)",
+        f"- **Failed proxies**: {results['total_checked']-results['total_working']} ({(results['total_checked']-results['total_working'])/results['total_checked']*100:.1f}%)",
+        "",  # Empty line for spacing
+        "### Results by Protocol",
+        "| Protocol | Checked | Working | Failed | Success % |",
+        "|----------|---------|---------|--------|-----------|"
+    ]
+    
+    # Add protocol results
+    for protocol, data in sorted(results["protocols"].items()):
+        results_section.append(
+            f"| {protocol:<8} | {data['checked']:<7} | {data['working']:<7} | {data['failed']:<6} | {data['success_rate']:.1f}% |"
+        )
+    
+    results_section.append("")  # Empty line for spacing
+    results_section.append("### Common Failure Reasons")
+    
+    # Add top failure reasons (limit to top 5)
+    sorted_reasons = sorted(results["failure_reasons"].items(), key=lambda x: x[1], reverse=True)
+    total_failures = results['total_checked'] - results['total_working']
+    
+    for reason, count in sorted_reasons[:5]:
+        percentage = (count / total_failures * 100) if total_failures > 0 else 0
+        results_section.append(f"- {reason}: {percentage:.1f}%")
+    
+    # Insert the results section at the appropriate position
+    updated_readme_lines = readme_lines[:insert_index] + results_section
+    
+    # Write the updated README
+    with open("README.md", "w") as f:
+        f.write('\n'.join(updated_readme_lines))
+
+
+def main(workers: int, types=["http", "socks4", "socks5"], verbosity=0):
     """
     Main function that orchestrates the proxy testing process.
     
@@ -556,6 +795,7 @@ def main(workers: int, types=["http", "socks4", "socks5"]):
         workers (int): Number of concurrent worker threads to use for testing proxies
         types (list, optional): List of proxy types to check. 
                                 Defaults to ["http", "socks4", "socks5"].
+        verbosity (int, optional): Logging verbosity level. Defaults to 0 (minimal).
     
     Returns:
         None
@@ -564,6 +804,10 @@ def main(workers: int, types=["http", "socks4", "socks5"]):
         This function coordinates the entire proxy checking workflow by calling
         specialized functions for each step of the process.
     """
+    # Set global verbosity level
+    global VERBOSITY_LEVEL
+    VERBOSITY_LEVEL = verbosity
+    
     log(f"Worker number: {workers}")
     log(f"Check timeout: {CHECK_TIMEOUT_SECONDS}s")
     log(f"Test websites: {[site for site in TEST_WEBSITES if not site.startswith('PLACEHOLDER')]}")
@@ -573,7 +817,7 @@ def main(workers: int, types=["http", "socks4", "socks5"]):
         if input("Go on without socks proxies check?(y/N): ") != "y":
             exit(1)
     
-    log("Loading proxies")
+    log("Loading proxies", verbosity=1)
     proxies = load_proxies(types=types)
     
     if not proxies:
@@ -585,7 +829,7 @@ def main(workers: int, types=["http", "socks4", "socks5"]):
     
     # Filter out blacklisted proxies
     proxies, skipped_count = filter_blacklisted_proxies(proxies, blacklist)
-    log(f"Skipped {skipped_count} blacklisted proxies")
+    log(f"Skipped {skipped_count} blacklisted proxies", verbosity=1)
     
     if not proxies:
         log("All proxies are blacklisted. Exiting.", "E")
@@ -609,7 +853,13 @@ def main(workers: int, types=["http", "socks4", "socks5"]):
     # Clean up worker threads
     cleanup_workers(proxy_queue, workers)
     
-    log("All done!")
+    # Display statistical summary
+    PROXY_STATS.display_summary()
+    
+    # Save test results
+    save_test_results(PROXY_STATS)
+    
+    log("All done!", verbosity=0)
 
 
 if __name__ == "__main__":
@@ -617,7 +867,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         workers = sys.argv[1]
     else:
-        workers = input("Worker number: (32) ")
+        workers = input("Please enter the number of workers: (defaults to 32) ")
     
     if not workers or not workers.isdigit():
         workers = 32
@@ -628,8 +878,12 @@ if __name__ == "__main__":
         log("It is not recommended to use more than 4096 workers.", "W")
     
     # Get proxy types to check
-    types_input = input("Proxy types to check (http,socks4,socks5): ")
+    types_input = input("Proxy types to check (defaults to all: http,socks4,socks5): ")
     types = types_input.split(',') if types_input else ["http", "socks4", "socks5"]
     
+    # Get verbosity level
+    verbosity_input = input("Verbosity level (0=minimal, 1=normal, 2=detailed) [defaults to 0]: ")
+    verbosity = int(verbosity_input) if verbosity_input and verbosity_input.isdigit() else 0
+    
     # Run the main function
-    main(workers, types=types)
+    main(workers, types=types, verbosity=verbosity)

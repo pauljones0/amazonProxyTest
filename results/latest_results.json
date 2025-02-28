@@ -1,0 +1,32 @@
+{
+  "timestamp": "2025-02-28T17:38:39.586019",
+  "total_checked": 123,
+  "total_working": 11,
+  "protocols": {
+    "socks4": {
+      "checked": 35,
+      "working": 6,
+      "failed": 29,
+      "success_rate": 17.142857142857142
+    },
+    "http": {
+      "checked": 68,
+      "working": 2,
+      "failed": 66,
+      "success_rate": 2.941176470588235
+    },
+    "socks5": {
+      "checked": 20,
+      "working": 3,
+      "failed": 17,
+      "success_rate": 15.0
+    }
+  },
+  "failure_reasons": {
+    "ConnectionError": 36,
+    "ProxyError": 52,
+    "HTTP 202": 5,
+    "SSLError": 3,
+    "ConnectTimeout": 16
+  }
+}

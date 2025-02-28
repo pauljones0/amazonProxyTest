@@ -1,0 +1,37 @@
+{
+  "timestamp": "2025-02-28T13:23:14.270563",
+  "total_checked": 44707,
+  "total_working": 72,
+  "protocols": {
+    "socks4": {
+      "checked": 14262,
+      "working": 25,
+      "failed": 14237,
+      "success_rate": 0.17529098303183283
+    },
+    "http": {
+      "checked": 17928,
+      "working": 35,
+      "failed": 17893,
+      "success_rate": 0.19522534582775547
+    },
+    "socks5": {
+      "checked": 12517,
+      "working": 12,
+      "failed": 12505,
+      "success_rate": 0.0958696173204442
+    }
+  },
+  "failure_reasons": {
+    "ConnectionError": 13125,
+    "ProxyError": 16807,
+    "SSLError": 594,
+    "ConnectTimeout": 13566,
+    "HTTP 202": 266,
+    "ReadTimeout": 203,
+    "InvalidURL": 60,
+    "ChunkedEncodingError": 2,
+    "Price not visible": 11,
+    "HTTP 500": 1
+  }
+}

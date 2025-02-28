@@ -1,6 +1,10 @@
 # Amazon Proxy Tester
 
-Tool for finding and validating proxies that can successfully browse Amazon product pages and display prices.
+Tool for finding and validating proxies that can successfully browse Amazon product pages and display prices. This is based off of [Proxy-Master](https://github.com/MuRongPIG/Proxy-Master), an amazing github repo that grabs Proxies and checks them, but the timeout on that is much quicker. I have a much slower timeout, but every single proxy that fails, is permanently added to a blacklist and is never checked again. This is a trade off I'm willing to make.
+
+## Goals of this project
+
+I made this project, as a way to find out if there were enough proxies out there to continually price check Amazon for price errors. The short answer is no. As far as I can tell Amazon has also blocked IP's coming from their AWS API gateway, so continually hammering Amazon to get their prices might be impossible (API gateway IP blocked and not enough free proxies out there and paid IP's not cheap enough). What's the next steps? IDK, but I think this is at a good place now.
 
 ## Features
 
@@ -60,4 +64,27 @@ python amazon_proxy_test.py 64
 # Enter: http,socks4,socks5
 ```
 
-Working proxies will be saved to `proxies/passing_proxies/` directory. 
+Working proxies will be saved to `proxies/passing_proxies/` directory.
+
+## Recent Results
+
+Last test run: 2025-02-28 17:38:39
+
+### Summary
+- **Total proxies checked**: 123
+- **Working proxies**: 11 (8.9%)
+- **Failed proxies**: 112 (91.1%)
+
+### Results by Protocol
+| Protocol | Checked | Working | Failed | Success % |
+|----------|---------|---------|--------|-----------|
+| socks4   | 35      | 6       | 29     | 17.1%     |
+| http     | 68      | 2       | 66     | 2.9%      |
+| socks5   | 20      | 3       | 17     | 15.0%     |
+
+### Common Failure Reasons
+- ProxyError: 46.4%
+- ConnectionError: 32.1%
+- ConnectTimeout: 14.3%
+- HTTP 202: 4.5%
+- SSLError: 2.7%
