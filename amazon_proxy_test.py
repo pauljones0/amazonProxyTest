@@ -863,27 +863,44 @@ def main(workers: int, types=["http", "socks4", "socks5"], verbosity=0):
 
 
 if __name__ == "__main__":
-    # Get worker count
-    if len(sys.argv) > 1:
-        workers = sys.argv[1]
-    else:
-        workers = input("Please enter the number of workers: (defaults to 32) ")
+    # Set default values
+    workers = 32
+    types = ["http", "socks4", "socks5"]
+    verbosity = 0
     
-    if not workers or not workers.isdigit():
-        workers = 32
-    else:
-        workers = int(workers)
+    try:
+        # Get values from command-line args if provided
+        if len(sys.argv) > 1 and sys.argv[1].isdigit():
+            workers = int(sys.argv[1])
+        
+        if len(sys.argv) > 2:
+            types = sys.argv[2].split(',')
+            
+        if len(sys.argv) > 3 and sys.argv[3].isdigit():
+            verbosity = int(sys.argv[3])
+        
+        # If no command-line args for workers, prompt for it
+        if len(sys.argv) <= 1:
+            workers_input = input("Please enter the number of workers: (defaults to 32) ")
+            if workers_input and workers_input.isdigit():
+                workers = int(workers_input)
+            
+            # Get proxy types
+            types_input = input("Proxy types to check (defaults to all: http,socks4,socks5): ")
+            if types_input:
+                types = types_input.split(',')
+            
+            # Get verbosity level
+            verbosity_input = input("Verbosity level (0=minimal, 1=normal, 2=detailed) [defaults to 0]: ")
+            if verbosity_input and verbosity_input.isdigit():
+                verbosity = int(verbosity_input)
+    except EOFError:
+        # Handle non-interactive environments gracefully
+        log("Running in non-interactive mode with defaults", "I")
     
+    # Warn if too many workers
     if workers >= 4096:
         log("It is not recommended to use more than 4096 workers.", "W")
-    
-    # Get proxy types to check
-    types_input = input("Proxy types to check (defaults to all: http,socks4,socks5): ")
-    types = types_input.split(',') if types_input else ["http", "socks4", "socks5"]
-    
-    # Get verbosity level
-    verbosity_input = input("Verbosity level (0=minimal, 1=normal, 2=detailed) [defaults to 0]: ")
-    verbosity = int(verbosity_input) if verbosity_input and verbosity_input.isdigit() else 0
     
     # Run the main function
     main(workers, types=types, verbosity=verbosity)
