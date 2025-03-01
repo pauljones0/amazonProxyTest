@@ -657,6 +657,11 @@ def save_test_results(stats):
     import json
     from datetime import datetime
     
+    # If no proxies were checked, skip results saving
+    if stats.total_checked == 0:
+        log("No proxies were checked, skipping results saving", "W")
+        return
+    
     # Create results directory if it doesn't exist
     results_dir = "results"
     if not os.path.exists(results_dir):
@@ -699,6 +704,11 @@ def update_readme_with_results(results):
     Args:
         results (dict): The test results dictionary
     """
+    # If no proxies were checked, prevent division by zero
+    if results['total_checked'] == 0:
+        log("No proxies were checked, skipping README update", "W")
+        return
+        
     # Read the current README
     with open("README.md", "r") as f:
         readme_content = f.read()
