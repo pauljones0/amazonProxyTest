@@ -30,8 +30,7 @@ jobs:
       
       - name: Run Amazon proxy test
         run: |
-          # Run with default workers (32) and check all proxy types non-interactively
-          python amazon_proxy_test.py 32 http,socks4,socks5 0
+          python amazon_proxy_test.py 32 http,socks4,socks5 1
 
       - name: Commit updated proxy files
         run: |
