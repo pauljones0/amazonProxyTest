@@ -28,9 +28,6 @@ PROXY_SOURCES = {
     "socks5": "https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/refs/heads/main/socks5.txt"
 }
 
-# Time threshold for refreshing proxy lists (180 minutes = 3 hours)
-REFRESH_THRESHOLD_MINUTES = 180
-
 # Folder paths for proxy files
 PROXY_FILES_FOLDER = "proxies/proxies"
 CHECKED_PROXY_FOLDER = "proxies/passing_proxies"
@@ -293,46 +290,10 @@ def ensure_folders_exist():
             log(f"Created folder: {folder}")
 
 
-def should_refresh_proxies():
-    """
-    Check if proxy files are older than the refresh threshold or don't exist.
-    
-    Returns:
-        bool: True if any proxy file is missing or older than REFRESH_THRESHOLD_MINUTES,
-              False if all files exist and are recent enough
-    
-    Note:
-        This function ensures that the necessary folders exist before checking files.
-        It checks all three proxy types (http, socks4, socks5) and returns True 
-        if any of them need refreshing.
-    """
-    ensure_folders_exist()
-    
-    for protocol in ["http", "socks4", "socks5"]:
-        filepath = os.path.join(PROXY_FILES_FOLDER, f"{protocol}.txt")
-        
-        # If file doesn't exist, we need to download
-        if not os.path.exists(filepath):
-            return True
-            
-        # Check file modification time
-        mod_time = os.path.getmtime(filepath)
-        mod_datetime = datetime.fromtimestamp(mod_time)
-        current_datetime = datetime.now()
-        
-        # Calculate minutes elapsed since last modification
-        minutes_elapsed = (current_datetime - mod_datetime).total_seconds() / 60
-        
-        # If any file is older than threshold, refresh all
-        if minutes_elapsed > REFRESH_THRESHOLD_MINUTES:
-            return True
-            
-    return False
-
-
 def download_proxy_list(protocol):
     """
     Download a proxy list for the specified protocol from predefined sources.
+    Always downloads fresh proxies each time.
     
     Args:
         protocol (str): The proxy protocol to download ("http", "socks4", or "socks5")
@@ -340,21 +301,17 @@ def download_proxy_list(protocol):
     Returns:
         list: A list of proxy addresses (as strings) that were downloaded,
               or an empty list if the download failed
-    
-    Note:
-        The function downloads from URLs defined in the PROXY_SOURCES dictionary
-        and saves the results to files in the PROXY_FILES_FOLDER directory.
     """
     ensure_folders_exist()
     
     try:
-        log(f"Downloading {protocol} proxies from repository")
+        log(f"Downloading fresh {protocol} proxies from repository")
         response = requests.get(PROXY_SOURCES[protocol], timeout=30)
         if response.status_code == 200:
             data = response.text.strip("\n").split("\n")
             log(f"Downloaded {len(data)} {protocol} proxies")
             
-            # Save to file
+            # Save to file, overwriting any existing file
             filepath = os.path.join(PROXY_FILES_FOLDER, f"{protocol}.txt")
             with open(filepath, "w") as f:
                 f.write(response.text)
@@ -555,7 +512,7 @@ def load_proxy_files(protocol, types):
 
 def load_proxies(types=["http", "socks4", "socks5"]):
     """
-    Load proxies of specified types from files, downloading if necessary.
+    Load proxies of specified types, always downloading fresh copies.
     
     Args:
         types (list, optional): List of proxy types to load. 
@@ -563,26 +520,18 @@ def load_proxies(types=["http", "socks4", "socks5"]):
     
     Returns:
         list: A list of Proxy objects representing all loaded proxies
-    
-    Note:
-        This function first checks if proxy files need refreshing (based on age or existence),
-        downloads fresh proxy lists if needed, then loads the proxies from the files.
-        Empty lines in proxy files are skipped.
     """
     proxies = []
     ensure_folders_exist()
     
-    # Check if we need to refresh the proxy files
-    refresh_needed = should_refresh_proxies()
-    if refresh_needed:
-        log("Proxy files are outdated or missing. Downloading fresh proxy lists...")
-        for protocol in types:
-            download_proxy_list(protocol)
-    
-    # Load proxies from files
+    # Always download fresh proxy lists
     for protocol in types:
-        protocol_proxies = load_proxy_files(protocol, types)
-        proxies.extend(protocol_proxies)
+        data = download_proxy_list(protocol)
+        for address in data:
+            if address.strip():  # Skip empty lines
+                proxies.append(Proxy(protocol, address))
+        
+        log(f"Loaded {len(data)} {protocol} proxies")
     
     return proxies
 
