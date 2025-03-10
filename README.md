@@ -68,23 +68,23 @@ Working proxies will be saved to `proxies/passing_proxies/` directory.
 
 ## Recent Results
 
-Last test run: 2025-03-10 13:00:01
+Last test run: 2025-03-10 15:37:08
 
 ### Summary
-- **Total proxies checked**: 6614
-- **Working proxies**: 27 (0.4%)
-- **Failed proxies**: 6587 (99.6%)
+- **Total proxies checked**: 5212
+- **Working proxies**: 33 (0.6%)
+- **Failed proxies**: 5179 (99.4%)
 
 ### Results by Protocol
 | Protocol | Checked | Working | Failed | Success % |
 |----------|---------|---------|--------|-----------|
-| http     | 2842    | 15      | 2827   | 0.5% |
-| socks4   | 2169    | 7       | 2162   | 0.3% |
-| socks5   | 1603    | 5       | 1598   | 0.3% |
+| http     | 2350    | 22      | 2328   | 0.9% |
+| socks4   | 1585    | 6       | 1579   | 0.4% |
+| socks5   | 1277    | 5       | 1272   | 0.4% |
 
 ### Common Failure Reasons
-- ProxyError: 41.8%
-- ConnectTimeout: 28.4%
-- ConnectionError: 28.1%
-- ReadTimeout: 0.6%
-- SSLError: 0.4%
+- ProxyError: 42.5%
+- ConnectionError: 29.4%
+- ConnectTimeout: 25.4%
+- SSLError: 0.9%
+- ReadTimeout: 0.9%
