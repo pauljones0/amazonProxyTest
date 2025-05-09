@@ -23,10 +23,10 @@
     }
   },
   "failure_reasons": {
-    "ConnectionError": 4818,
+    "ConnectionError": 4819,
     "ProxyError": 2285,
     "HTTP 202": 172,
-    "ConnectTimeout": 5211,
+    "ConnectTimeout": 5212,
     "ReadTimeout": 419,
     "HTTP 500": 3,
     "SSLError": 67,
