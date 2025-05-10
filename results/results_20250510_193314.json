@@ -24,7 +24,7 @@
   },
   "failure_reasons": {
     "ProxyError": 5014,
-    "ConnectionError": 4563,
+    "ConnectionError": 4564,
     "HTTP 202": 492,
     "ConnectTimeout": 3384,
     "ReadTimeout": 1095,
