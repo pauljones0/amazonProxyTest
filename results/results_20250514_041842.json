@@ -27,7 +27,7 @@
     "ProxyError": 2880,
     "SSLError": 69,
     "HTTP 202": 69,
-    "ConnectTimeout": 4496,
+    "ConnectTimeout": 4497,
     "ReadTimeout": 248,
     "Price not visible": 43,
     "ChunkedEncodingError": 6,
