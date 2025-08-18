@@ -1,0 +1,1 @@
+[![Update Amazon Proxies](https://github.com/pauljones0/amazonProxyTest/actions/workflows/update_proxies.yml/badge.svg)](https://github.com/pauljones0/amazonProxyTest/actions/workflows/update_proxies.yml)
